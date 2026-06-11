@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="GYM">
+<title>GYM</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0e0e0e;
+    --surface: #1a1a1a;
+    --border: #2a2a2a;
+    --text: #f0f0f0;
+    --muted: #666;
+    --accent: #e8e8e8;
+    --in-color: #c8f0c8;
+    --in-dim: #3a5a3a;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, 'Helvetica Neue', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+
+  .app {
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 24px;
+    gap: 0;
+  }
+
+  .label {
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+
+  /* Timer display */
+  .timer-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 48px;
+  }
+
+  .timer {
+    font-size: clamp(64px, 18vw, 96px);
+    font-weight: 200;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    color: var(--text);
+    transition: color 0.4s ease;
+    min-width: 280px;
+    text-align: center;
+  }
+
+  .timer.active {
+    color: var(--in-color);
+  }
+
+  .timer-idle {
+    color: var(--muted);
+  }
+
+  /* Status dot */
+  .status-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 16px;
+    height: 20px;
+  }
+
+  .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background 0.4s ease;
+  }
+
+  .dot.active {
+    background: var(--in-color);
+    box-shadow: 0 0 8px var(--in-color);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .status-text {
+    font-size: 13px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+    transition: color 0.4s ease;
+  }
+
+  .status-text.active {
+    color: var(--in-color);
+  }
+
+  /* Main button */
+  .btn-main {
+    width: 100%;
+    max-width: 280px;
+    padding: 20px;
+    border-radius: 14px;
+    border: 1.5px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 16px;
+    font-weight: 500;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+    outline: none;
+  }
+
+  .btn-main:active {
+    transform: scale(0.97);
+    background: #222;
+  }
+
+  .btn-main.checked-in {
+    border-color: var(--in-dim);
+    background: #1a2a1a;
+    color: var(--in-color);
+  }
+
+  /* History */
+  .history {
+    margin-top: 40px;
+    width: 100%;
+    max-width: 280px;
+  }
+
+  .history-title {
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  .history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 160px;
+    overflow-y: auto;
+  }
+
+  .history-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 14px;
+    background: var(--surface);
+    border-radius: 10px;
+    border: 1px solid var(--border);
+  }
+
+  .history-date {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .history-duration {
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+  }
+
+  .empty-history {
+    font-size: 13px;
+    color: var(--muted);
+    text-align: center;
+    padding: 16px 0;
+  }
+
+  /* Scrollbar */
+  .history-list::-webkit-scrollbar { width: 0; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="timer-wrap">
+    <div class="label" id="label">今日の滞在時間</div>
+    <div class="timer timer-idle" id="timer">—:——:——</div>
+    <div class="status-row">
+      <div class="dot" id="dot"></div>
+      <span class="status-text" id="statusText">未入館</span>
+    </div>
+  </div>
+
+  <button class="btn-main" id="mainBtn" onclick="toggle()">入館</button>
+
+  <div class="history" id="historySection">
+    <div class="history-title">履歴</div>
+    <div class="history-list" id="historyList"></div>
+  </div>
+
+</div>
+
+<script>
+  let startTime = null;
+  let timerInterval = null;
+  let sessions = JSON.parse(localStorage.getItem('gym_sessions') || '[]');
+
+  const timerEl = document.getElementById('timer');
+  const dotEl = document.getElementById('dot');
+  const statusEl = document.getElementById('statusText');
+  const btnEl = document.getElementById('mainBtn');
+
+  function pad(n) { return String(n).padStart(2, '0'); }
+
+  function formatElapsed(ms) {
+    const s = Math.floor(ms / 1000);
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    return `${pad(h)}:${pad(m)}:${pad(sec)}`;
+  }
+
+  function formatDate(ts) {
+    const d = new Date(ts);
+    const m = d.getMonth() + 1;
+    const day = d.getDate();
+    const hh = pad(d.getHours());
+    const mm = pad(d.getMinutes());
+    return `${m}/${day}  ${hh}:${mm}`;
+  }
+
+  function formatDuration(ms) {
+    const s = Math.floor(ms / 1000);
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    if (h > 0) return `${h}h ${m}m`;
+    return `${m}m`;
+  }
+
+  function setCheckedIn(on) {
+    timerEl.classList.toggle('active', on);
+    timerEl.classList.toggle('timer-idle', !on);
+    dotEl.classList.toggle('active', on);
+    statusEl.classList.toggle('active', on);
+    statusEl.textContent = on ? 'トレーニング中' : '未入館';
+    btnEl.textContent = on ? '退館' : '入館';
+    btnEl.classList.toggle('checked-in', on);
+  }
+
+  function toggle() {
+    if (!startTime) {
+      // Check in
+      startTime = Date.now();
+      localStorage.setItem('gym_start', startTime);
+      setCheckedIn(true);
+      timerInterval = setInterval(() => {
+        timerEl.textContent = formatElapsed(Date.now() - startTime);
+      }, 1000);
+    } else {
+      // Check out
+      const duration = Date.now() - startTime;
+      sessions.unshift({ start: startTime, duration });
+      if (sessions.length > 20) sessions = sessions.slice(0, 20);
+      localStorage.setItem('gym_sessions', JSON.stringify(sessions));
+      localStorage.removeItem('gym_start');
+      clearInterval(timerInterval);
+      timerInterval = null;
+      startTime = null;
+      setCheckedIn(false);
+      timerEl.textContent = '—:——:——';
+      renderHistory();
+    }
+  }
+
+  function renderHistory() {
+    const list = document.getElementById('historyList');
+    if (sessions.length === 0) {
+      list.innerHTML = '<div class="empty-history">まだ記録がありません</div>';
+      return;
+    }
+    list.innerHTML = sessions.map(s => `
+      <div class="history-item">
+        <span class="history-date">${formatDate(s.start)}</span>
+        <span class="history-duration">${formatDuration(s.duration)}</span>
+      </div>
+    `).join('');
+  }
+
+  // Restore state on reload
+  const savedStart = localStorage.getItem('gym_start');
+  if (savedStart) {
+    startTime = parseInt(savedStart);
+    setCheckedIn(true);
+    timerEl.textContent = formatElapsed(Date.now() - startTime);
+    timerInterval = setInterval(() => {
+      timerEl.textContent = formatElapsed(Date.now() - startTime);
+    }, 1000);
+  }
+
+  renderHistory();
+</script>
+</body>
+</html>
